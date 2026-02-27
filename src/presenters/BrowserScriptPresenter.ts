@@ -38,11 +38,16 @@ export class BrowserScriptPresenter {
       }
 
       if (textarea) {
-        textarea.value = finding.finding;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        // Trigger the auto-expand logic if it exists
-        textarea.style.height = 'auto';
-        textarea.style.height = textarea.scrollHeight + 'px';
+        if (finding.status === 'No') {
+          textarea.value = finding.finding;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          // Trigger the auto-expand logic if it exists
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        } else {
+          textarea.value = '';
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       }
       
       console.log(\`✅ Filled: \${finding.itemId}\`);

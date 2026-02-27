@@ -11,8 +11,9 @@ export class ReviewBranchChanges {
   ) {}
 
   async execute(
+    userStory: string,
+    acceptanceCriteria: string,
     baseBranch: string | null = null,
-    huRequirements?: string,
     onEvent?: (event: any) => void,
   ): Promise<Finding[]> {
     // 1. Get code changes
@@ -41,7 +42,8 @@ export class ReviewBranchChanges {
         checklist,
         standards,
         diff: gitContext.diff,
-        huRequirements,
+        userStory,
+        acceptanceCriteria,
       },
       onEvent,
     );

@@ -29,27 +29,45 @@ Provide a JSON response for each checklist item with status (Sí/No/N/A) and fin
     fs.writeFileSync(agentsFile, agentsContent);
 
     // 2. Prepare Codex Prompt
-    const systemInstruction = `You are a Senior Software Engineer at Media Aérea performing a critical Peer Review.
-Your task is to review the git diff for the current branch against the 'Standards' and 'Checklist' provided in AGENTS.md.
+    const systemInstruction = `You are a Senior Software Engineer at Media Aérea performing a critical Peer Review as an Acceptance Criteria Auditor.
 
-Run the appropriate git diff command yourself to see the changes you need to review. Don't ask the user for it.
+Your PRIMARY MISSION is to perform a technical audit of the code changes against the specific 'Acceptance Criteria' (AC) of the 'User Story' (HU).
 
-RULES:
-1. For each item in the checklist, determine if the code satisfies it (Sí), fails it (No), or if it's not applicable (N/A).
-2. Provide specific evidence and findings.
-3. If an HU requirement is provided, ensure the code satisfies the Acceptance Criteria.
-4. Output ONLY a valid JSON array. No conversational text.
+AUDIT PROTOCOL:
+1. Parse the 'Acceptance Criteria' list into individual, actionable points.
+2. For EACH point, find technical evidence in the code diff that confirms it is either 'Satisfied' (Sí) or 'Violated' (No).
+3. If an AC is not applicable to the current changes, mark as 'N/A'.
+4. After the AC Audit, perform a secondary review against the general Media Aérea 'Standards' and 'Checklist'.
+5. Map every finding either to a specific AC point or a Checklist item ID.
+
+OBSERVATIONS STYLE:
+- Language: Spanish.
+- Tone: Natural, professional, and developer-to-developer. Avoid robotic "No cumple..." prefixes.
+- Conciseness: Maximum 15-20 words.
+- Evidence-based: Mention specific files or line logic (e.g., "Falta validación de 100 char en el DTO" instead of "El campo nombre no cumple con la longitud máxima").
+
+Output ONLY a valid JSON array. No conversational text.
 `;
 
     const prompt = `${systemInstruction}
 
-Review context:
-- HU Requirements: ${request.huRequirements || "N/A"}
+--- BUSINESS CONTEXT (HU) ---
+${request.userStory}
 
-EXPECTED OUTPUT FORMAT (JSON ONLY):
+--- TECHNICAL CONTRACT (Acceptance Criteria) ---
+${request.acceptanceCriteria}
+
+--- GENERAL STANDARDS ---
+Checklist: See AGENTS.md
+
+--- EXPECTED OUTPUT FORMAT (JSON ONLY) ---
 ---BEGIN_JSON---
 [
-  { "itemId": "Exactly as written in checklist", "status": "Sí|No|N/A", "finding": "Brief explanation" }
+  { 
+    "itemId": "AC: [Requirement Name] or Checklist ID", 
+    "status": "Sí|No|N/A", 
+    "finding": "Specific evidence from the code (concise)" 
+  }
 ]
 ---END_JSON---
 `;

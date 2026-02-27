@@ -4,7 +4,8 @@ export interface AIReviewRequest {
   checklist: string[];
   standards: string;
   diff: string;
-  huRequirements?: string | undefined;
+  userStory: string;
+  acceptanceCriteria: string;
 }
 
 export interface AIDriver {

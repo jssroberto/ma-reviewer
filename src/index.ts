@@ -1,6 +1,7 @@
-#!/usr/bin/env tsx
 import chalk from "chalk";
 import { Command } from "commander";
+import * as fs from "fs";
+import inquirer from "inquirer";
 import { ReviewBranchChanges } from "./core/use-cases/ReviewBranchChanges.js";
 import { CodexDriver } from "./drivers/ai/CodexDriver.js";
 import { SimpleGitDriver } from "./drivers/git/SimpleGitDriver.js";
@@ -43,19 +44,120 @@ program
     const consolePresenter = new ConsolePresenter();
     const feedbackPresenter = new FeedbackPresenter();
 
-    // 2. Execution
+    // 2. Collection of HU & AC (Mandatory Auditor Flow)
+    let userStory = "";
+    let acceptanceCriteria = "";
+
+    if ((options as any).userStory) {
+      const userStoryPath = (options as any).userStory;
+      if (fs.existsSync(userStoryPath)) {
+        const content = fs.readFileSync(userStoryPath, "utf-8");
+        // Simple parsing: split by "Criterios" or similar if possible,
+        // but for now let's assume the user might provide a structured file.
+        // As a fallback, we'll treat the whole file as both or prompt for clarity.
+        const sections = content.split(/criterios de aceptaci[óo]n/i);
+        userStory = (sections[0] || "").trim();
+        acceptanceCriteria = sections[1] ? sections[1].trim() : "";
+
+        if (!acceptanceCriteria) {
+          console.log(
+            chalk.yellow(
+              "⚠️ Criteria section not detected in file. Please provide it manually.",
+            ),
+          );
+        }
+      } else {
+        console.error(
+          chalk.red(`\n❌ User Story file not found: ${options.userStory}`),
+        );
+        process.exit(1);
+      }
+    }
+
+    if (!userStory || !acceptanceCriteria) {
+      try {
+        const answers = await inquirer.prompt([
+          {
+            type: "rawlist",
+            name: "method",
+            message:
+              "Acceptance Criteria Audit is mandatory. How would you like to provide the details?",
+            choices: [
+              { name: "Input manually (Story & Criteria)", value: "manual" },
+              { name: "Provide path to a structured HU file", value: "file" },
+            ],
+            when: () => !userStory || !acceptanceCriteria,
+          },
+          {
+            type: "input",
+            name: "story",
+            message: "1. Historia de Usuario (The 'Who/What/Why'):",
+            when: (a: any) =>
+              a.method === "manual" || (!userStory && a.method !== "file"),
+            validate: (input: string) =>
+              input.trim().length > 10 || "Story too short.",
+          },
+          {
+            type: "editor",
+            name: "criteria",
+            message: "2. Criterios de Aceptación (The technical contract):",
+            when: (a: any) =>
+              a.method === "manual" ||
+              (!acceptanceCriteria && a.method !== "file"),
+            validate: (input: string) =>
+              input.trim().length > 10 || "Criteria too short.",
+          },
+          {
+            type: "input",
+            name: "path",
+            message: "Enter the path to the structured HU file:",
+            when: (a: any) => a.method === "file",
+            validate: (input: string) =>
+              fs.existsSync(input) || "File not found.",
+          },
+        ]);
+
+        if (answers.method === "manual") {
+          userStory = answers.story || userStory;
+          acceptanceCriteria = answers.criteria || acceptanceCriteria;
+        } else if (answers.method === "file" && answers.path) {
+          const content = fs.readFileSync(answers.path, "utf-8");
+          const sections = content.split(/criterios de aceptaci[óo]n/i);
+          userStory = (sections[0] || "").trim();
+          acceptanceCriteria = sections[1] ? sections[1].trim() : "";
+        }
+      } catch (e: any) {
+        if (e.name === "ExitPromptError") {
+          console.log(chalk.yellow("\n⚠️ Review cancelled by user."));
+          process.exit(0);
+        }
+        throw e;
+      }
+    }
+
+    if (!userStory || !acceptanceCriteria) {
+      console.error(
+        chalk.red(
+          "\n❌ Error: Both Historia de Usuario and Criterios de Aceptación are mandatory.",
+        ),
+      );
+      process.exit(1);
+    }
+
+    // 3. Execution
     try {
       feedbackPresenter.start();
 
       const findings = await useCase.execute(
-        options.base === "origin/main" ? null : options.base,
-        undefined, // HU Requirements
-        (event) => feedbackPresenter.handleEvent(event),
+        userStory,
+        acceptanceCriteria,
+        (options as any).base === "origin/main" ? null : (options as any).base,
+        (event: any) => feedbackPresenter.handleEvent(event),
       );
 
       feedbackPresenter.stop();
 
-      // 3. Display Results
+      // 4. Display Results
       console.log(chalk.green.bold("✅ Review Complete!\n"));
 
       console.log(chalk.yellow("--- Terminal Summary ---"));
