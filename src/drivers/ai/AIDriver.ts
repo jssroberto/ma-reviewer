@@ -8,5 +8,8 @@ export interface AIReviewRequest {
 }
 
 export interface AIDriver {
-  review(request: AIReviewRequest): Promise<Finding[]>;
+  review(
+    request: AIReviewRequest,
+    onEvent?: (event: any) => void,
+  ): Promise<Finding[]>;
 }

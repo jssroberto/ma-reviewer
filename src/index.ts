@@ -6,6 +6,7 @@ import { CodexDriver } from "./drivers/ai/CodexDriver.js";
 import { SimpleGitDriver } from "./drivers/git/SimpleGitDriver.js";
 import { BrowserScriptPresenter } from "./presenters/BrowserScriptPresenter.js";
 import { ConsolePresenter } from "./presenters/ConsolePresenter.js";
+import { FeedbackPresenter } from "./presenters/FeedbackPresenter.js";
 
 const program = new Command();
 
@@ -40,12 +41,19 @@ program
     const useCase = new ReviewBranchChanges(gitDriver, aiDriver);
     const browserPresenter = new BrowserScriptPresenter();
     const consolePresenter = new ConsolePresenter();
+    const feedbackPresenter = new FeedbackPresenter();
 
     // 2. Execution
     try {
+      feedbackPresenter.start();
+
       const findings = await useCase.execute(
         options.base === "origin/main" ? null : options.base,
+        undefined, // HU Requirements
+        (event) => feedbackPresenter.handleEvent(event),
       );
+
+      feedbackPresenter.stop();
 
       // 3. Display Results
       console.log(chalk.green.bold("✅ Review Complete!\n"));

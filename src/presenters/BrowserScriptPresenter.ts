@@ -18,7 +18,14 @@ export class BrowserScriptPresenter {
   findings.forEach(finding => {
     // 1. Find the row by specification text (this is the most reliable way)
     const rows = Array.from(document.querySelectorAll('tr'));
-    const targetRow = rows.find(tr => tr.innerText.includes(finding.itemId));
+    
+    const normalize = (str) => str.toLowerCase().replace(/\s+/g, ' ').trim();
+    const targetRow = rows.find(tr => {
+      const rowText = normalize(tr.innerText);
+      const searchId = normalize(finding.itemId);
+      // Use includes or a high-similarity check
+      return rowText.includes(searchId) || searchId.includes(rowText.substring(0, 20));
+    });
 
     if (targetRow) {
       // 2. Find the select and textarea in this row

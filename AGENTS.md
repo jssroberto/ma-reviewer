@@ -465,7 +465,7 @@ Las vistas declaradas en el sistema deberán seguir las siguientes especificacio
 61. ¿Las vistas se encuentran protegidas con los permisos relevantes o con el de inicio de sesión en su defecto?
 62. ¿Los archivos se encuentran bien organizados dentro de sus respectivas carpetas?
 63. ¿Todos los archivos tienen una función? No hay archivos intulizados dentro del repositorio.
-64. ¿Se ha considerado la escalabilidad del código, especially en términos de manejo de grandes volúmenes de datos o de alta concurrencia?
+64. ¿Se ha considerado la escalabilidad del código, especialmente en términos de manejo de grandes volúmenes de datos o de alta concurrencia?
 65. Se ejecutaron y pasaron todas las pruebas unitarias.
 66. El código fue integrado y versionado correctamente (el commit incluye el ID de la funcionalidad desarrollada y una descripción de lo realizado).
 67. Se ejecutaron pruebas de integración a nivel de desarrollo.

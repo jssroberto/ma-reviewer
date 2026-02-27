@@ -13,6 +13,7 @@ export class ReviewBranchChanges {
   async execute(
     baseBranch: string | null = null,
     huRequirements?: string,
+    onEvent?: (event: any) => void,
   ): Promise<Finding[]> {
     // 1. Get code changes
     const gitContext = await this.gitDriver.getDiff(baseBranch);
@@ -35,11 +36,14 @@ export class ReviewBranchChanges {
     const checklist = [...checklistData.frontend, ...checklistData.backend];
 
     // 3. Perform AI Review
-    return await this.aiDriver.review({
-      checklist,
-      standards,
-      diff: gitContext.diff,
-      huRequirements,
-    });
+    return await this.aiDriver.review(
+      {
+        checklist,
+        standards,
+        diff: gitContext.diff,
+        huRequirements,
+      },
+      onEvent,
+    );
   }
 }

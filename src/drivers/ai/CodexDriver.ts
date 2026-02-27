@@ -1,11 +1,16 @@
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import { createInterface } from "readline";
 import type { Finding } from "../../core/entities/Review.js";
+import { JsonExtractor } from "../../core/utils/JsonExtractor.js";
 import type { AIDriver, AIReviewRequest } from "./AIDriver.js";
 
 export class CodexDriver implements AIDriver {
-  async review(request: AIReviewRequest): Promise<Finding[]> {
+  async review(
+    request: AIReviewRequest,
+    onEvent?: (event: any) => void,
+  ): Promise<Finding[]> {
     const agentsFile = path.join(process.cwd(), "AGENTS.md");
 
     // 1. Prepare AGENTS.md with standards and checklist
@@ -23,7 +28,7 @@ Provide a JSON response for each checklist item with status (Sí/No/N/A) and fin
 `;
     fs.writeFileSync(agentsFile, agentsContent);
 
-    // 2. Spawn Codex Review
+    // 2. Prepare Codex Prompt
     const systemInstruction = `You are a Senior Software Engineer at Media Aérea performing a critical Peer Review.
 Your task is to review the git diff for the current branch against the 'Standards' and 'Checklist' provided in AGENTS.md.
 
@@ -49,46 +54,65 @@ EXPECTED OUTPUT FORMAT (JSON ONLY):
 ---END_JSON---
 `;
 
-    console.log("🧠 Codex is thinking... this may take 30-60 seconds.");
+    return new Promise((resolve, reject) => {
+      let fullOutput = "";
 
-    try {
-      // Use spawnSync to avoid shell execution limits and unescaped character issues
-      const result = spawnSync(
+      const child = spawn(
         "codex",
-        ["--dangerously-bypass-approvals-and-sandbox", "exec", prompt],
-        { encoding: "utf-8" },
+        ["--dangerously-bypass-approvals-and-sandbox", "exec", "--json", "-"],
+        { shell: false },
       );
 
-      if (result.error) {
-        throw result.error;
-      }
+      // Send prompt via stdin
+      child.stdin.write(prompt);
+      child.stdin.end();
 
-      const output = result.stdout;
-      const stderr = result.stderr;
+      const rl = createInterface({ input: child.stdout });
 
-      // 3. Parse JSON from output using markers
-      const startMarker = "---BEGIN_JSON---";
-      const endMarker = "---END_JSON---";
+      rl.on("line", (line) => {
+        try {
+          const event = JSON.parse(line);
 
-      const startIndex = output.indexOf(startMarker);
-      const endIndex = output.indexOf(endMarker);
+          // If it's a message item, accumulate it for final extraction
+          if (
+            event.type === "item.completed" &&
+            event.item?.type === "agent_message"
+          ) {
+            fullOutput += event.item.text + "\n";
+          }
 
-      if (startIndex === -1 || endIndex === -1) {
-        console.error("RAW CODEX STDOUT:\n", output);
-        console.error("RAW CODEX STDERR:\n", stderr);
-        throw new Error("Missing JSON markers in Codex output");
-      }
+          // Forward event to listener
+          if (onEvent) onEvent(event);
+        } catch (e) {
+          // If not valid JSON, it might be raw output or markers
+          fullOutput += line + "\n";
+        }
+      });
 
-      const jsonString = output
-        .substring(startIndex + startMarker.length, endIndex)
-        .trim();
-      return JSON.parse(jsonString);
-    } catch (error) {
-      console.error("Codex Review Failed:", error);
-      return [];
-    } finally {
-      // Optional: cleanup AGENTS.md
-      // fs.unlinkSync(agentsFile);
-    }
+      child.stderr.on("data", (data) => {
+        // Silencing stderr for events unless we decide to log it
+      });
+
+      child.on("close", (code) => {
+        if (code !== 0) {
+          return reject(new Error(`Codex process exited with code ${code}`));
+        }
+
+        try {
+          const findings = JsonExtractor.extract<Finding[]>(
+            fullOutput,
+            "---BEGIN_JSON---",
+            "---END_JSON---",
+          );
+          resolve(findings);
+        } catch (error) {
+          resolve([]);
+        }
+      });
+
+      child.on("error", (err) => {
+        reject(err);
+      });
+    });
   }
 }

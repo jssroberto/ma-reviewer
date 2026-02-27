@@ -65,7 +65,7 @@
     "¿Las vistas se encuentran protegidas con los permisos relevantes o con el de inicio de sesión en su defecto?",
     "¿Los archivos se encuentran bien organizados dentro de sus respectivas carpetas?",
     "¿Todos los archivos tienen una función? No hay archivos intulizados dentro del repositorio.",
-    "¿Se ha considerado la escalabilidad del código, especially en términos de manejo de grandes volúmenes de datos o de alta concurrencia?",
+    "¿Se ha considerado la escalabilidad del código, especialmente en términos de manejo de grandes volúmenes de datos o de alta concurrencia?",
     "Se ejecutaron y pasaron todas las pruebas unitarias.",
     "El código fue integrado y versionado correctamente (el commit incluye el ID de la funcionalidad desarrollada y una descripción de lo realizado).",
     "Se ejecutaron pruebas de integración a nivel de desarrollo.",
