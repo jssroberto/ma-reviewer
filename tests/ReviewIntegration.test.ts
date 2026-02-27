@@ -23,7 +23,11 @@ describe("ReviewBranchChanges Use Case", () => {
     };
 
     const useCase = new ReviewBranchChanges(mockGit, mockAI);
-    const findings = await useCase.execute("main");
+    const findings = await useCase.execute(
+      "Test Story",
+      "Test Criteria",
+      "main",
+    );
 
     expect(findings).toHaveLength(1);
     expect(findings[0]!.itemId).toBe("Standard 1");

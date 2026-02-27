@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import inquirer from "inquirer";
 import { ReviewBranchChanges } from "./core/use-cases/ReviewBranchChanges.js";
 import { CodexDriver } from "./drivers/ai/CodexDriver.js";
@@ -8,6 +10,33 @@ import { SimpleGitDriver } from "./drivers/git/SimpleGitDriver.js";
 import { BrowserScriptPresenter } from "./presenters/BrowserScriptPresenter.js";
 import { ConsolePresenter } from "./presenters/ConsolePresenter.js";
 import { FeedbackPresenter } from "./presenters/FeedbackPresenter.js";
+
+const CACHE_FILE = path.join(os.homedir(), ".ma-reviewer-cache.json");
+
+function saveStoryToCache(story: string, criteria: string) {
+  try {
+    if (!story) return;
+    const featureName =
+      story.split("\n")[0]?.substring(0, 50).trim() || "Untitled";
+    fs.writeFileSync(
+      CACHE_FILE,
+      JSON.stringify({ story, criteria, featureName }),
+    );
+  } catch (e) {
+    // Ignore cache errors
+  }
+}
+
+function getStoryFromCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8"));
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
 
 const program = new Command();
 
@@ -33,6 +62,7 @@ program
     "-s, --user-story <file>",
     "Path to file with User Story requirements",
   )
+  .option("--scope <type>", "Scope of the review (frontend, backend, both)")
   .action(async (options) => {
     console.log(chalk.blue.bold("\n🚀 Starting Media Aérea Peer Review...\n"));
 
@@ -52,9 +82,6 @@ program
       const userStoryPath = (options as any).userStory;
       if (fs.existsSync(userStoryPath)) {
         const content = fs.readFileSync(userStoryPath, "utf-8");
-        // Simple parsing: split by "Criterios" or similar if possible,
-        // but for now let's assume the user might provide a structured file.
-        // As a fallback, we'll treat the whole file as both or prompt for clarity.
         const sections = content.split(/criterios de aceptaci[óo]n/i);
         userStory = (sections[0] || "").trim();
         acceptanceCriteria = sections[1] ? sections[1].trim() : "";
@@ -76,55 +103,76 @@ program
 
     if (!userStory || !acceptanceCriteria) {
       try {
-        const answers = await inquirer.prompt([
-          {
-            type: "rawlist",
-            name: "method",
-            message:
-              "Acceptance Criteria Audit is mandatory. How would you like to provide the details?",
-            choices: [
-              { name: "Input manually (Story & Criteria)", value: "manual" },
-              { name: "Provide path to a structured HU file", value: "file" },
-            ],
-            when: () => !userStory || !acceptanceCriteria,
-          },
-          {
-            type: "input",
-            name: "story",
-            message: "1. Historia de Usuario (The 'Who/What/Why'):",
-            when: (a: any) =>
-              a.method === "manual" || (!userStory && a.method !== "file"),
-            validate: (input: string) =>
-              input.trim().length > 10 || "Story too short.",
-          },
-          {
-            type: "editor",
-            name: "criteria",
-            message: "2. Criterios de Aceptación (The technical contract):",
-            when: (a: any) =>
-              a.method === "manual" ||
-              (!acceptanceCriteria && a.method !== "file"),
-            validate: (input: string) =>
-              input.trim().length > 10 || "Criteria too short.",
-          },
-          {
-            type: "input",
-            name: "path",
-            message: "Enter the path to the structured HU file:",
-            when: (a: any) => a.method === "file",
-            validate: (input: string) =>
-              fs.existsSync(input) || "File not found.",
-          },
-        ]);
+        const cache = getStoryFromCache();
+        let reuseCache = false;
 
-        if (answers.method === "manual") {
-          userStory = answers.story || userStory;
-          acceptanceCriteria = answers.criteria || acceptanceCriteria;
-        } else if (answers.method === "file" && answers.path) {
-          const content = fs.readFileSync(answers.path, "utf-8");
-          const sections = content.split(/criterios de aceptaci[óo]n/i);
-          userStory = (sections[0] || "").trim();
-          acceptanceCriteria = sections[1] ? sections[1].trim() : "";
+        if (cache) {
+          const { reuse } = await inquirer.prompt([
+            {
+              type: "confirm",
+              name: "reuse",
+              message: `I found a previous story for "${chalk.cyan(cache.featureName)}". Do you want to reuse it?`,
+              default: true,
+            },
+          ]);
+          reuseCache = reuse;
+          if (reuseCache) {
+            userStory = cache.story;
+            acceptanceCriteria = cache.criteria;
+          }
+        }
+
+        if (!reuseCache) {
+          const answers = await inquirer.prompt([
+            {
+              type: "rawlist",
+              name: "method",
+              message:
+                "Acceptance Criteria Audit is mandatory. How would you like to provide the details?",
+              choices: [
+                { name: "Input manually (Story & Criteria)", value: "manual" },
+                { name: "Provide path to a structured HU file", value: "file" },
+              ],
+              when: () => !userStory || !acceptanceCriteria,
+            },
+            {
+              type: "input",
+              name: "story",
+              message: "1. Historia de Usuario (The 'Who/What/Why'):",
+              when: (a: any) =>
+                a.method === "manual" || (!userStory && a.method !== "file"),
+              validate: (input: string) =>
+                input.trim().length > 10 || "Story too short.",
+            },
+            {
+              type: "editor",
+              name: "criteria",
+              message: "2. Criterios de Aceptación (The technical contract):",
+              when: (a: any) =>
+                a.method === "manual" ||
+                (!acceptanceCriteria && a.method !== "file"),
+              validate: (input: string) =>
+                input.trim().length > 10 || "Criteria too short.",
+            },
+            {
+              type: "input",
+              name: "path",
+              message: "Enter the path to the structured HU file:",
+              when: (a: any) => a.method === "file",
+              validate: (input: string) =>
+                fs.existsSync(input) || "File not found.",
+            },
+          ]);
+
+          if (answers.method === "manual") {
+            userStory = answers.story || userStory;
+            acceptanceCriteria = answers.criteria || acceptanceCriteria;
+          } else if (answers.method === "file" && answers.path) {
+            const content = fs.readFileSync(answers.path, "utf-8");
+            const sections = content.split(/criterios de aceptaci[óo]n/i);
+            userStory = (sections[0] || "").trim();
+            acceptanceCriteria = sections[1] ? sections[1].trim() : "";
+          }
         }
       } catch (e: any) {
         if (e.name === "ExitPromptError") {
@@ -144,6 +192,27 @@ program
       process.exit(1);
     }
 
+    // Save to cache for next time
+    saveStoryToCache(userStory, acceptanceCriteria);
+
+    // 2.1 Scope Selection
+    let scope = (options as any).scope;
+    if (!scope || !["frontend", "backend", "both"].includes(scope)) {
+      const { selectedScope } = await inquirer.prompt([
+        {
+          type: "rawlist",
+          name: "selectedScope",
+          message: "Select Review Scope:",
+          choices: [
+            { name: "Frontend", value: "frontend" },
+            { name: "Backend", value: "backend" },
+            { name: "Both (Full Stack)", value: "both" },
+          ],
+        },
+      ]);
+      scope = selectedScope;
+    }
+
     // 3. Execution
     try {
       feedbackPresenter.start();
@@ -153,6 +222,7 @@ program
         acceptanceCriteria,
         (options as any).base === "origin/main" ? null : (options as any).base,
         (event: any) => feedbackPresenter.handleEvent(event),
+        scope as any,
       );
 
       feedbackPresenter.stop();

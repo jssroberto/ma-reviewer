@@ -29,7 +29,9 @@ Provide a JSON response for each checklist item with status (Sí/No/N/A) and fin
     fs.writeFileSync(agentsFile, agentsContent);
 
     // 2. Prepare Codex Prompt
-    const systemInstruction = `You are a Senior Software Engineer at Media Aérea performing a critical Peer Review as an Acceptance Criteria Auditor.
+    const scopeLabel =
+      request.scope === "both" ? "Full Stack" : request.scope.toUpperCase();
+    const systemInstruction = `You are a Senior Software Engineer at Media Aérea performing a critical Peer Review as an Acceptance Criteria Auditor for a ${scopeLabel} component.
 
 Your PRIMARY MISSION is to perform a technical audit of the code changes against the specific 'Acceptance Criteria' (AC) of the 'User Story' (HU).
 

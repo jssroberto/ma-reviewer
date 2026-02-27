@@ -1,3 +1,4 @@
+import chalk from "chalk";
 import type { SimpleGit } from "simple-git";
 import { simpleGit } from "simple-git";
 import type { GitContext, GitDriver } from "./GitDriver.js";
@@ -16,36 +17,42 @@ export class SimpleGitDriver implements GitDriver {
     if (!targetBase) {
       try {
         const branches = await this.git.branch();
-        const possibleMain = ["main", "master", "origin/main", "origin/master"];
+        const possibleMain = [
+          "dev",
+          "development",
+          "origin/dev",
+          "origin/development",
+        ];
         targetBase = possibleMain.find((b) => branches.all.includes(b)) || null;
+
+        if (targetBase) {
+          console.log(
+            chalk.gray(
+              `🔍 Autodetected base branch: ${chalk.bold(targetBase)}`,
+            ),
+          );
+        }
       } catch (e) {
         targetBase = null;
       }
     }
 
-    // Default to the last commit OR empty tree if repo is brand new
-    let revision = targetBase ? `${targetBase}...HEAD` : "HEAD~1";
+    if (!targetBase) {
+      throw new Error(
+        "Could not determine a base branch (main, master, dev, development). Please specify one using --base <branch>.",
+      );
+    }
+
+    const revision = `${targetBase}...HEAD`;
 
     try {
-      // 2. Initial Attempt
+      // 2. Validate revision
       const base = revision.split("...")[0] || "HEAD";
       await this.git.revparse([base]);
     } catch (e) {
-      // Revision doesn't exist (e.g., HEAD~1 on a 1-commit repo)
-      console.warn(
-        `⚠️ Revision ${revision} not found. checking repo history...`,
+      throw new Error(
+        `Technical error: Base branch '${targetBase}' exists but is not reachable or valid for diffing.`,
       );
-      try {
-        const log = await this.git.log({ maxCount: 2 });
-        if (log.all.length === 1) {
-          // Special Git SHA for empty tree
-          revision = "4b825dc642cb6eb9a060e54bf8d69288fbee4904...HEAD";
-        } else {
-          revision = "HEAD";
-        }
-      } catch (logError) {
-        revision = "HEAD";
-      }
     }
 
     try {
@@ -57,9 +64,7 @@ export class SimpleGitDriver implements GitDriver {
         changedFiles: status.files.map((f) => f.file),
       };
     } catch (error: any) {
-      console.error(
-        `❌ Git diff failed completely even with fallback ${revision}`,
-      );
+      console.error(`❌ Git diff failed completely for revision ${revision}`);
       return { diff: "", changedFiles: [] };
     }
   }

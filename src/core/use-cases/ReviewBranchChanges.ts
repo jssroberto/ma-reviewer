@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { AIDriver } from "../../drivers/ai/AIDriver.js";
+import type { AIDriver, ReviewScope } from "../../drivers/ai/AIDriver.js";
 import type { GitDriver } from "../../drivers/git/GitDriver.js";
 import type { Finding } from "../entities/Review.js";
 
@@ -15,6 +15,7 @@ export class ReviewBranchChanges {
     acceptanceCriteria: string,
     baseBranch: string | null = null,
     onEvent?: (event: any) => void,
+    scope: ReviewScope = "both",
   ): Promise<Finding[]> {
     // 1. Get code changes
     const gitContext = await this.gitDriver.getDiff(baseBranch);
@@ -34,7 +35,15 @@ export class ReviewBranchChanges {
 
     const checklistPath = path.join(rootPath, "resources", "checklist.json");
     const checklistData = JSON.parse(fs.readFileSync(checklistPath, "utf-8"));
-    const checklist = [...checklistData.frontend, ...checklistData.backend];
+
+    let checklist: string[] = [];
+    if (scope === "frontend") {
+      checklist = checklistData.frontend;
+    } else if (scope === "backend") {
+      checklist = checklistData.backend;
+    } else {
+      checklist = [...checklistData.frontend, ...checklistData.backend];
+    }
 
     // 3. Perform AI Review
     return await this.aiDriver.review(
@@ -44,6 +53,7 @@ export class ReviewBranchChanges {
         diff: gitContext.diff,
         userStory,
         acceptanceCriteria,
+        scope,
       },
       onEvent,
     );
