@@ -1,12 +1,16 @@
 import type { Finding } from "../core/entities/Review.js";
 
 export class BrowserScriptPresenter {
-  generateAutoFill(findings: Finding[]): string {
+  generateAutoFill(
+    findings: Finding[],
+    scope: "frontend" | "backend" | "both",
+  ): string {
     const findingsJson = JSON.stringify(findings);
 
     return `
 (function() {
   const findings = ${findingsJson};
+  const scope = "${scope}";
   console.log("🚀 MA-Reviewer: Starting auto-fill...");
 
   const statusMap = {
@@ -16,19 +20,44 @@ export class BrowserScriptPresenter {
   };
 
   findings.forEach(finding => {
-    // 1. Find the row by specification text (this is the most reliable way)
-    const rows = Array.from(document.querySelectorAll('tr'));
-    
-    const normalize = (str) => str.toLowerCase().replace(/\s+/g, ' ').trim();
-    const targetRow = rows.find(tr => {
-      const rowText = normalize(tr.innerText);
-      const searchId = normalize(finding.itemId);
-      // Use includes or a high-similarity check
-      return rowText.includes(searchId) || searchId.includes(rowText.substring(0, 20));
-    });
+    let isAC = finding.itemId.startsWith("AC:");
 
-    if (targetRow) {
-      // 2. Find the select and textarea in this row
+    if (isAC) {
+      console.log(\`ℹ️ Skipping AC observation in DOM auto-fill: \${finding.itemId}\`);
+      return;
+    }
+
+    const match = finding.itemId.match(/\\d+/);
+    if (!match) {
+      console.warn(\`⚠️ Could not parse item ID: \${finding.itemId}\`);
+      return;
+    }
+
+    const idNumber = parseInt(match[0], 10);
+    let inputName = '';
+    let inputValue = '';
+    
+    if (scope === "frontend") {
+      inputName = 'catF_id[]';
+      inputValue = idNumber.toString();
+    } else if (scope === "backend") {
+      inputName = 'catB_id[]';
+      inputValue = idNumber.toString();
+    } else {
+      // both
+      if (idNumber <= 42) {
+        inputName = 'catF_id[]';
+        inputValue = idNumber.toString();
+      } else {
+        inputName = 'catB_id[]';
+        inputValue = (idNumber - 42).toString();
+      }
+    }
+
+    const hiddenInput = document.querySelector(\`input[type="hidden"][name="\${inputName}"][value="\${inputValue}"]\`);
+
+    if (hiddenInput) {
+      const targetRow = hiddenInput.closest('tr');
       const select = targetRow.querySelector('select.select-cumple');
       const textarea = targetRow.querySelector('textarea.input-observacion');
 
@@ -40,19 +69,22 @@ export class BrowserScriptPresenter {
       if (textarea) {
         if (finding.status === 'No') {
           textarea.value = finding.finding;
+          textarea.removeAttribute('readonly');
+          textarea.setAttribute('required', 'true');
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          // Trigger the auto-expand logic if it exists
           textarea.style.height = 'auto';
           textarea.style.height = textarea.scrollHeight + 'px';
         } else {
           textarea.value = '';
+          textarea.setAttribute('readonly', 'true');
+          textarea.removeAttribute('required');
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
       }
       
       console.log(\`✅ Filled: \${finding.itemId}\`);
     } else {
-      console.warn(\`⚠️ Could not find row for: \${finding.itemId}\`);
+      console.warn(\`⚠️ Could not find DOM element for: \${finding.itemId}\`);
     }
   });
 

@@ -244,7 +244,7 @@ program
           "------------------------------------------------------------",
         ),
       );
-      console.log(browserPresenter.generateAutoFill(findings));
+      console.log(browserPresenter.generateAutoFill(findings, scope as any));
       console.log(
         chalk.white(
           "------------------------------------------------------------",
