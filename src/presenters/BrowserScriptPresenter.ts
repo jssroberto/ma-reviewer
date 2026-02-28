@@ -42,8 +42,8 @@ export class BrowserScriptPresenter {
         border-radius: 4px;
         border-left: 2px solid #0891b2;
         font-family: inherit;
-        color: #94a3b8;
-        font-size: 11px;
+        color: #e2e8f0;
+        font-size: 12px;
         line-height: 1.4;
         display: flex;
         align-items: flex-start;
@@ -52,7 +52,7 @@ export class BrowserScriptPresenter {
       .ma-reviewer-hint-badge {
         background-color: rgba(8, 145, 178, 0.1);
         color: #22d3ee;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
         padding: 1px 4px;

@@ -5,7 +5,6 @@ export class FeedbackPresenter {
   private spinner: Ora;
 
   private rotationInterval?: NodeJS.Timeout;
-  private currentProgress = 0;
   private totalItems = 0;
 
   private readonly ANALYZING_MESSAGES = [
@@ -15,11 +14,19 @@ export class FeedbackPresenter {
     "⚡ Identifying potential performance bottlenecks...",
     "📚 Cross-referencing with Media Aérea standards...",
     "🔍 Searching for redundant or obsolete code...",
+    "🧪 Simulating execution paths and edge cases...",
+    "🧩 Mapping component interdependencies...",
+    "📐 Verifying adherence to project architecture...",
+    "🔐 Scanning for sensitive data and exposures...",
+    "🚀 Optimizing diff context for better insights...",
+    "🧪 Validating technical debt and refactor needs...",
+    "📝 Drafting evidence-based observations...",
+    "✨ Polishing the final review findings...",
   ];
 
   constructor() {
     this.spinner = ora({
-      text: chalk.blue("🧠 Codex is initializing..."),
+      text: chalk.blue("🧠 Initializing AI Review Agent..."),
       color: "cyan",
     });
   }
@@ -44,7 +51,7 @@ export class FeedbackPresenter {
       index = (index + 1) % messages.length;
       const msg = messages[index];
       if (msg) this.updateText(msg);
-    }, 3000);
+    }, 3000); // Slightly faster rotation
   }
 
   private stopRotation() {
@@ -55,11 +62,7 @@ export class FeedbackPresenter {
   }
 
   private updateText(text: string) {
-    const progressText =
-      this.totalItems > 0
-        ? chalk.dim(` (${this.currentProgress}/${this.totalItems})`)
-        : "";
-    this.spinner.text = text + progressText;
+    this.spinner.text = text;
   }
 
   handleEvent(event: any) {
@@ -80,19 +83,19 @@ export class FeedbackPresenter {
         this.updateText(chalk.yellow(`🛠️ Running ${toolName}...`));
         break;
       case "item.processed":
-        this.currentProgress++;
-        const currentText = this.spinner.text.split(" (")[0] || "";
-        this.updateText(currentText); // Keep current text, update counter
+        // No counter display: keeps the UI cleaner
         break;
       case "reasoning.completed":
-        this.stopRotation();
-        this.updateText(
-          chalk.green("✅ Logic analysis complete. Drafting findings..."),
-        );
+        // Keep the rotation going with the same pool during the quiet drafting phase
         break;
       case "item.completed":
         if (event.item?.type === "agent_message") {
-          this.updateText(chalk.blue("✍️ Receiving final findings..."));
+          // If we were not already rotating, ensure we are using the full technical pool
+          if (!this.rotationInterval) {
+            this.startRotation(
+              this.ANALYZING_MESSAGES.map((m) => chalk.blue(m)),
+            );
+          }
         }
         break;
       case "turn.completed":

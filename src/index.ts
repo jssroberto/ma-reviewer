@@ -263,6 +263,68 @@ program
       selectedStandardsFile = standards;
     }
 
+    // 2.2 Target Branch(es) Selection
+    const allBranches = await gitDriver.listBranches();
+    const localBranches = allBranches.filter((b) => !b.startsWith("remotes/"));
+
+    const { selectedBranches } = await inquirer.prompt([
+      {
+        type: "checkbox",
+        name: "selectedBranches",
+        message:
+          "Which FEATURE branch(es) do you want to audit? (Space to select)",
+        choices: localBranches.map((b) => ({
+          name: b,
+          value: b,
+          checked: false, // Start clean: let the developer choose
+        })),
+        validate: (input) =>
+          input.length > 0 || "Please select at least one branch to continue.",
+      },
+    ]);
+    const targetBranches = selectedBranches as string[];
+
+    // 2.3 Base Branch Selection
+    let selectedBase = (options as any).base;
+
+    if (!selectedBase || selectedBase === "origin/main") {
+      // Exclude selected target branches from candidate list
+      const availableBaseBranches = allBranches.filter(
+        (b) => !targetBranches.includes(b),
+      );
+
+      // Heuristic for default base
+      const defaultBaseCandidate = availableBaseBranches.find((b) =>
+        [
+          "development",
+          "dev",
+          "origin/development",
+          "origin/dev",
+          "main",
+          "master",
+          "origin/main",
+        ].includes(b),
+      );
+
+      const { base } = await inquirer.prompt([
+        {
+          type: "rawlist", // Better visibility in some terminals
+          name: "base",
+          message:
+            "Which BASE branch should we compare against? (Merge target)",
+          choices: availableBaseBranches.map((b) => ({
+            name:
+              b === defaultBaseCandidate
+                ? `${b} ${chalk.dim("(recommended)")}`
+                : b,
+            value: b,
+          })),
+          default: defaultBaseCandidate,
+        },
+      ]);
+      selectedBase = base;
+    }
+
     (global as any).selectedStandardsFile = selectedStandardsFile;
     const standardsContent =
       selectedStandardsFile === "none"
@@ -272,7 +334,7 @@ program
             "utf-8",
           );
 
-    // 2.2 Scope Selection
+    // 2.4 Scope Selection
     let scope = (options as any).scope;
     if (!scope || !["frontend", "backend", "both"].includes(scope)) {
       const { selectedScope } = await inquirer.prompt([
@@ -290,30 +352,6 @@ program
       scope = selectedScope;
     }
 
-    // 3. Branch Selection Logic
-    const allBranches = await gitDriver.listBranches();
-    let targetBranches: string[] = [];
-
-    // Filter out origin/ branches for cleaner local selection if desired, or keep all
-    const localBranches = allBranches.filter((b) => !b.startsWith("remotes/"));
-
-    const { selectedBranches } = await inquirer.prompt([
-      {
-        type: "checkbox",
-        name: "selectedBranches",
-        message: "Select branch(es) to review against the base:",
-        choices: localBranches.map((b) => ({
-          name: b,
-          value: b,
-          checked:
-            b === "HEAD" || b === allBranches.find((curr) => curr !== "HEAD"), // Heuristic: check current
-        })),
-        validate: (input) =>
-          input.length > 0 || "You must select at least one branch.",
-      },
-    ]);
-    targetBranches = selectedBranches;
-
     // 4. Execution
     try {
       feedbackPresenter.start();
@@ -322,7 +360,7 @@ program
         userStory,
         acceptanceCriteria,
         standardsContent,
-        (options as any).base === "origin/main" ? null : (options as any).base,
+        selectedBase,
         targetBranches,
         (event: any) => feedbackPresenter.handleEvent(event),
         scope as any,
