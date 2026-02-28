@@ -2,12 +2,12 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
-import inquirer from "inquirer";
 import { ReviewBranchChanges } from "./core/use-cases/ReviewBranchChanges.js";
 import { CodexDriver } from "./drivers/ai/CodexDriver.js";
 import { SimpleGitDriver } from "./drivers/git/SimpleGitDriver.js";
+import { InquirerPromptDriver } from "./drivers/cli/InquirerPromptDriver.js";
+import { CacheService } from "./core/utils/CacheService.js";
 import { BrowserScriptPresenter } from "./presenters/BrowserScriptPresenter.js";
 import { ConsolePresenter } from "./presenters/ConsolePresenter.js";
 import { FeedbackPresenter } from "./presenters/FeedbackPresenter.js";
@@ -18,38 +18,6 @@ There are no specific technical standards for this project.
 As long as the code is functional, readable, and fulfill the Acceptance Criteria, it should be marked as compliant.
 For the technical audit section, set the status to "Si" (compliant) unless a critical bug or security flaw is identified.
 `;
-
-const CACHE_FILE = path.join(os.homedir(), ".ma-reviewer-cache.json");
-
-function saveStoryToCache(story: string, criteria: string) {
-  try {
-    if (!story) return;
-    const featureName =
-      story.split("\n")[0]?.substring(0, 50).trim() || "Untitled";
-    fs.writeFileSync(
-      CACHE_FILE,
-      JSON.stringify({
-        story,
-        criteria,
-        featureName,
-        standardsFile: (global as any).selectedStandardsFile,
-      }),
-    );
-  } catch (e) {
-    // Ignore cache errors
-  }
-}
-
-function getStoryFromCache() {
-  try {
-    if (fs.existsSync(CACHE_FILE)) {
-      return JSON.parse(fs.readFileSync(CACHE_FILE, "utf-8"));
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
 
 const program = new Command();
 
@@ -81,118 +49,37 @@ program
 
     // 1. Dependency Injection
     const gitDriver = new SimpleGitDriver();
-    const aiDriver = new CodexDriver(); // Future: Factory based on options.driver
+    const aiDriver = new CodexDriver();
+    const promptDriver = new InquirerPromptDriver();
+    const cacheService = new CacheService();
     const useCase = new ReviewBranchChanges(gitDriver, aiDriver);
     const browserPresenter = new BrowserScriptPresenter();
     const consolePresenter = new ConsolePresenter();
     const feedbackPresenter = new FeedbackPresenter();
 
-    // 2. Collection of HU & AC (Mandatory Auditor Flow)
+    // 2. Collection of HU & AC
     let userStory = "";
     let acceptanceCriteria = "";
 
-    if ((options as any).userStory) {
-      const userStoryPath = (options as any).userStory;
-      if (fs.existsSync(userStoryPath)) {
-        const content = fs.readFileSync(userStoryPath, "utf-8");
-        const sections = content.split(/criterios de aceptaci[óo]n/i);
-        userStory = (sections[0] || "").trim();
-        acceptanceCriteria = sections[1] ? sections[1].trim() : "";
-
-        if (!acceptanceCriteria) {
-          console.log(
-            chalk.yellow(
-              "⚠️ Criteria section not detected in file. Please provide it manually.",
-            ),
-          );
-        }
-      } else {
-        console.error(
-          chalk.red(`\n❌ User Story file not found: ${options.userStory}`),
-        );
-        process.exit(1);
-      }
+    if (options.userStory && fs.existsSync(options.userStory)) {
+      const content = fs.readFileSync(options.userStory, "utf-8");
+      const sections = content.split(/criterios de aceptaci[óo]n/i);
+      userStory = (sections[0] || "").trim();
+      acceptanceCriteria = sections[1] ? sections[1].trim() : "";
     }
 
     if (!userStory || !acceptanceCriteria) {
-      try {
-        const cache = getStoryFromCache();
-        let reuseCache = false;
-
-        if (cache) {
-          const { reuse } = await inquirer.prompt([
-            {
-              type: "confirm",
-              name: "reuse",
-              message: `I found a previous story for "${chalk.cyan(cache.featureName)}". Do you want to reuse it?`,
-              default: true,
-            },
-          ]);
-          reuseCache = reuse;
-          if (reuseCache) {
-            userStory = cache.story;
-            acceptanceCriteria = cache.criteria;
-          }
-        }
-
-        if (!reuseCache) {
-          const answers = await inquirer.prompt([
-            {
-              type: "rawlist",
-              name: "method",
-              message:
-                "Acceptance Criteria Audit is mandatory. How would you like to provide the details?",
-              choices: [
-                { name: "Input manually (Story & Criteria)", value: "manual" },
-                { name: "Provide path to a structured HU file", value: "file" },
-              ],
-              when: () => !userStory || !acceptanceCriteria,
-            },
-            {
-              type: "input",
-              name: "story",
-              message: "1. Historia de Usuario (The 'Who/What/Why'):",
-              when: (a: any) =>
-                a.method === "manual" || (!userStory && a.method !== "file"),
-              validate: (input: string) =>
-                input.trim().length > 10 || "Story too short.",
-            },
-            {
-              type: "editor",
-              name: "criteria",
-              message: "2. Criterios de Aceptación (The technical contract):",
-              when: (a: any) =>
-                a.method === "manual" ||
-                (!acceptanceCriteria && a.method !== "file"),
-              validate: (input: string) =>
-                input.trim().length > 10 || "Criteria too short.",
-            },
-            {
-              type: "input",
-              name: "path",
-              message: "Enter the path to the structured HU file:",
-              when: (a: any) => a.method === "file",
-              validate: (input: string) =>
-                fs.existsSync(input) || "File not found.",
-            },
-          ]);
-
-          if (answers.method === "manual") {
-            userStory = answers.story || userStory;
-            acceptanceCriteria = answers.criteria || acceptanceCriteria;
-          } else if (answers.method === "file" && answers.path) {
-            const content = fs.readFileSync(answers.path, "utf-8");
-            const sections = content.split(/criterios de aceptaci[óo]n/i);
-            userStory = (sections[0] || "").trim();
-            acceptanceCriteria = sections[1] ? sections[1].trim() : "";
-          }
-        }
-      } catch (e: any) {
-        if (e.name === "ExitPromptError") {
-          console.log(chalk.yellow("\n⚠️ Review cancelled by user."));
-          process.exit(0);
-        }
-        throw e;
+      const cacheData = cacheService.get();
+      if (
+        cacheData &&
+        (await promptDriver.confirmReuse(cacheData.featureName))
+      ) {
+        userStory = cacheData.story;
+        acceptanceCriteria = cacheData.criteria;
+      } else {
+        const result = await promptDriver.collectUserStory();
+        userStory = result.userStory;
+        acceptanceCriteria = result.acceptanceCriteria;
       }
     }
 
@@ -205,10 +92,7 @@ program
       process.exit(1);
     }
 
-    // Save to cache for next time
-    saveStoryToCache(userStory, acceptanceCriteria);
-
-    // 2.1 Technology Standards Selection
+    // 3. Standards Selection
     const resourcesPath = path.join(
       path.dirname(new URL(import.meta.url).pathname),
       "../resources/standards",
@@ -218,83 +102,44 @@ program
       .filter((f) => f.endsWith(".md"));
 
     let selectedStandardsFile = "";
-    const cache = getStoryFromCache();
+    const currentCache = cacheService.get();
 
     if (
-      cache &&
-      cache.standardsFile &&
-      standardsFiles.includes(cache.standardsFile)
+      currentCache?.standardsFile &&
+      standardsFiles.includes(currentCache.standardsFile)
     ) {
-      const { reuseStandards } = await inquirer.prompt([
-        {
-          type: "confirm",
-          name: "reuseStandards",
-          message: `Reuse standards for "${chalk.cyan(cache.standardsFile)}"?`,
-          default: true,
-        },
-      ]);
-      if (reuseStandards) {
-        selectedStandardsFile = cache.standardsFile;
+      if (
+        await promptDriver.confirmReuseStandards(currentCache.standardsFile)
+      ) {
+        selectedStandardsFile = currentCache.standardsFile;
       }
     }
 
     if (!selectedStandardsFile) {
-      const { standards } = await inquirer.prompt([
-        {
-          type: "rawlist",
-          name: "standards",
-          message: "Select Technology Standards:",
-          choices: [
-            ...standardsFiles.map((f) => ({
-              name: f
-                .replace(".md", "")
-                .split("-")
-                .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-                .join(" "),
-              value: f,
-            })),
-            {
-              name: chalk.yellow("None (Acceptance Criteria Only)"),
-              value: "none",
-            },
-          ],
-        },
-      ]);
-      selectedStandardsFile = standards;
+      selectedStandardsFile =
+        await promptDriver.selectStandards(standardsFiles);
     }
 
-    // 2.2 Target Branch(es) Selection
+    const standardsContent =
+      selectedStandardsFile === "none"
+        ? GENERIC_STANDARDS_INSTRUCTION
+        : fs.readFileSync(
+            path.join(resourcesPath, selectedStandardsFile),
+            "utf-8",
+          );
+
+    // 4. Branch Selection
     const allBranches = await gitDriver.listBranches();
-    const localBranches = allBranches.filter((b) => !b.startsWith("remotes/"));
+    const targetBranches = await promptDriver.selectBranches(
+      allBranches.filter((b) => !b.startsWith("remotes/")),
+    );
 
-    const { selectedBranches } = await inquirer.prompt([
-      {
-        type: "checkbox",
-        name: "selectedBranches",
-        message:
-          "Which FEATURE branch(es) do you want to audit? (Space to select)",
-        choices: localBranches.map((b) => ({
-          name: b,
-          value: b,
-          checked: false, // Start clean: let the developer choose
-        })),
-        validate: (input) =>
-          input.length > 0 || "Please select at least one branch to continue.",
-      },
-    ]);
-    const targetBranches = selectedBranches as string[];
-
-    // 2.3 Base Branch Selection
-    let selectedBase = (options as any).base;
-
+    let selectedBase = options.base;
     if (!selectedBase || selectedBase === "origin/main") {
-      // Exclude selected target branches from candidate list
       const availableBaseBranches = allBranches.filter(
         (b) => !targetBranches.includes(b),
       );
-
-      // Heuristic for default base
-      const defaultBaseCandidate = availableBaseBranches.find((b) =>
+      const recommendedBase = availableBaseBranches.find((b) =>
         [
           "development",
           "dev",
@@ -305,72 +150,41 @@ program
           "origin/main",
         ].includes(b),
       );
-
-      const { base } = await inquirer.prompt([
-        {
-          type: "rawlist", // Better visibility in some terminals
-          name: "base",
-          message:
-            "Which BASE branch should we compare against? (Merge target)",
-          choices: availableBaseBranches.map((b) => ({
-            name:
-              b === defaultBaseCandidate
-                ? `${b} ${chalk.dim("(recommended)")}`
-                : b,
-            value: b,
-          })),
-          default: defaultBaseCandidate,
-        },
-      ]);
-      selectedBase = base;
+      selectedBase = await promptDriver.selectBaseBranch(
+        availableBaseBranches,
+        recommendedBase,
+      );
     }
 
-    (global as any).selectedStandardsFile = selectedStandardsFile;
-    const standardsContent =
-      selectedStandardsFile === "none"
-        ? GENERIC_STANDARDS_INSTRUCTION
-        : fs.readFileSync(
-            path.join(resourcesPath, selectedStandardsFile),
-            "utf-8",
-          );
-
-    // 2.4 Scope Selection
-    let scope = (options as any).scope;
+    // 5. Scope Selection
+    let scope = options.scope;
     if (!scope || !["frontend", "backend", "both"].includes(scope)) {
-      const { selectedScope } = await inquirer.prompt([
-        {
-          type: "rawlist",
-          name: "selectedScope",
-          message: "Select Review Scope:",
-          choices: [
-            { name: "Frontend", value: "frontend" },
-            { name: "Backend", value: "backend" },
-            { name: "Both (Full Stack)", value: "both" },
-          ],
-        },
-      ]);
-      scope = selectedScope;
+      scope = await promptDriver.selectScope();
     }
 
-    // 4. Execution
+    // 6. Cache for next time
+    cacheService.save({
+      story: userStory,
+      criteria: acceptanceCriteria,
+      featureName: CacheService.generateFeatureName(userStory),
+      standardsFile: selectedStandardsFile,
+    });
+
+    // 7. Execution
     try {
       feedbackPresenter.start();
-
       const findings = await useCase.execute(
         userStory,
         acceptanceCriteria,
         standardsContent,
         selectedBase,
         targetBranches,
-        (event: any) => feedbackPresenter.handleEvent(event),
+        (event) => feedbackPresenter.handleEvent(event),
         scope as any,
       );
-
       feedbackPresenter.stop();
 
-      // 4. Display Results
       console.log(chalk.green.bold("✅ Review Complete!\n"));
-
       console.log(chalk.yellow("--- Terminal Summary ---"));
       consolePresenter.displayFindings(findings);
 
