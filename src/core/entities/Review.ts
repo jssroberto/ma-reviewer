@@ -1,4 +1,4 @@
-export type ChecklistStatus = "Sí" | "No" | "N/A";
+export type ChecklistStatus = "Sí" | "No" | "N/A" | "Manual";
 
 export interface Finding {
   itemId: string;

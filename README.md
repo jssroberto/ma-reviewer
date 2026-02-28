@@ -9,7 +9,8 @@ Unlike generic linters, this tool acts as an **Acceptance Criteria Auditor**, ve
 ## ✨ Key Features
 
 - **🔎 Acceptance Criteria Audit**: Specialized two-step flow that validates the code against the "Who/What/Why" (Historia de Usuario) and the "Technical Contract" (Criterios de Aceptación).
-- **📋 Master Checklist Integration**: Audits code against Media Aérea's 71-point master certification checklist.
+- **🌍 Multi-Language Standards**: Native support for language-specific audits including JavaScript/TypeScript, Python/Django, PHP/Laravel, Kotlin/Mobile, and Web Performance.
+- **📋 Master Checklist Integration**: Audits code against Media Aérea's master certification checklist, adapted to the specific review scope.
 - **⚡ Real-Time Feedback**: Asynchronous execution model with a live terminal spinner and high-fidelity status updates.
 - **🎨 Browser Auto-fill**: Generates a custom Javascript snippet to automatically populate the internal Media Aérea review tool with the AI's findings.
 - **🛡️ Robust AI Driver**: Resilient JSON parsing that handles "dirty" AI outputs and uses `stdin` for secure prompt handling.
@@ -56,9 +57,15 @@ pnpm run review -b dev
 
 # Provide the User Story file directly
 pnpm run review -s ./docs/MY_USER_STORY.md
+
+# Specify review scope (frontend, backend, both)
+pnpm run review --scope backend
 ```
 
-If you don't provide a `--user-story` flag, the CLI will interactively prompt you for the **Historia de Usuario** and **Criterios de Aceptación**.
+If you don't provide mandatory info via flags, the CLI will interactively prompt you for:
+1.  **Historia de Usuario & Criterios de Aceptación** (Input manually or provide file path).
+2.  **Technology Standards Selection**: Choose from Python, PHP, Kotlin, JS/TS, or Web Performance.
+3.  **Review Scope**: Filter the checklist for Frontend, Backend, or Full Stack (Both).
 
 ---
 

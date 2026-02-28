@@ -16,7 +16,8 @@ export class BrowserScriptPresenter {
   const statusMap = {
     'Sí': 'true',
     'No': 'false',
-    'N/A': 'null'
+    'N/A': 'null',
+    'Manual': ''
   };
 
   findings.forEach(finding => {
@@ -74,6 +75,29 @@ export class BrowserScriptPresenter {
           textarea.dispatchEvent(new Event('input', { bubbles: true }));
           textarea.style.height = 'auto';
           textarea.style.height = textarea.scrollHeight + 'px';
+        } else if (finding.status === 'Manual') {
+          textarea.value = ''; // Clean for user input
+          textarea.removeAttribute('readonly');
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+          // Inject Visual Hint Badge
+          const hint = document.createElement('div');
+          hint.className = 'ma-reviewer-hint';
+          hint.style.all = 'initial';
+          hint.style.display = 'block';
+          hint.style.marginTop = '8px';
+          hint.style.padding = '8px';
+          hint.style.backgroundColor = '#e0fafa';
+          hint.style.border = '1px dashed #008b8b';
+          hint.style.borderRadius = '4px';
+          hint.style.color = '#006666';
+          hint.style.fontFamily = 'sans-serif';
+          hint.style.fontSize = '12px';
+          hint.style.lineHeight = '1.4';
+          hint.innerHTML = \`<strong>🤖 AI HINT:</strong> \${finding.finding}\`;
+          
+          // Append to the observation cell
+          textarea.parentNode.appendChild(hint);
         } else {
           textarea.value = '';
           textarea.setAttribute('readonly', 'true');

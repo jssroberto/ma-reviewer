@@ -38,7 +38,7 @@ export class ReviewBranchChanges {
     }
 
     // 3. Perform AI Review
-    return await this.aiDriver.review(
+    const findings = await this.aiDriver.review(
       {
         checklist,
         standards,
@@ -49,5 +49,10 @@ export class ReviewBranchChanges {
       },
       onEvent,
     );
+
+    // 4. Post-process with deterministic middleware
+    const { ManualReviewMiddleware } =
+      await import("../utils/ManualReviewMiddleware.js");
+    return ManualReviewMiddleware.sanitize(findings);
   }
 }

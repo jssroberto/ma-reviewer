@@ -37,7 +37,9 @@ export class ConsolePresenter {
           ? chalk.green("✅ Sí")
           : f.status === "No"
             ? chalk.red("❌ No")
-            : chalk.gray("⚪ N/A");
+            : f.status === "Manual"
+              ? chalk.cyan("⚠️ Manual")
+              : chalk.gray("⚪ N/A");
 
       table.push([statusIcon, chalk.bold(f.itemId), f.finding]);
     });

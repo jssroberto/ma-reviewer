@@ -12,6 +12,13 @@ import { BrowserScriptPresenter } from "./presenters/BrowserScriptPresenter.js";
 import { ConsolePresenter } from "./presenters/ConsolePresenter.js";
 import { FeedbackPresenter } from "./presenters/FeedbackPresenter.js";
 
+const GENERIC_STANDARDS_INSTRUCTION = `
+## No Specific Standards
+There are no specific technical standards for this project. 
+As long as the code is functional, readable, and fulfill the Acceptance Criteria, it should be marked as compliant.
+For the technical audit section, set the status to "Si" (compliant) unless a critical bug or security flaw is identified.
+`;
+
 const CACHE_FILE = path.join(os.homedir(), ".ma-reviewer-cache.json");
 
 function saveStoryToCache(story: string, criteria: string) {
@@ -237,24 +244,33 @@ program
           type: "rawlist",
           name: "standards",
           message: "Select Technology Standards:",
-          choices: standardsFiles.map((f) => ({
-            name: f
-              .replace(".md", "")
-              .split("-")
-              .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-              .join(" "),
-            value: f,
-          })),
+          choices: [
+            ...standardsFiles.map((f) => ({
+              name: f
+                .replace(".md", "")
+                .split("-")
+                .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+                .join(" "),
+              value: f,
+            })),
+            {
+              name: chalk.yellow("None (Acceptance Criteria Only)"),
+              value: "none",
+            },
+          ],
         },
       ]);
       selectedStandardsFile = standards;
     }
 
     (global as any).selectedStandardsFile = selectedStandardsFile;
-    const standardsContent = fs.readFileSync(
-      path.join(resourcesPath, selectedStandardsFile),
-      "utf-8",
-    );
+    const standardsContent =
+      selectedStandardsFile === "none"
+        ? GENERIC_STANDARDS_INSTRUCTION
+        : fs.readFileSync(
+            path.join(resourcesPath, selectedStandardsFile),
+            "utf-8",
+          );
 
     // 2.2 Scope Selection
     let scope = (options as any).scope;
