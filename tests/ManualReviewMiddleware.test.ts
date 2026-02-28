@@ -13,10 +13,10 @@ describe("ManualReviewMiddleware", () => {
 
     const results = ManualReviewMiddleware.sanitize(findings);
 
-    expect(results[0].status).toBe("Manual");
-    expect(results[1].status).toBe("Manual");
-    expect(results[2].status).toBe("Sí"); // Should stay the same
-    expect(results[3].status).toBe("Manual"); // Should NOW be Manual (previously stayed N/A)
+    expect(results[0]!.status).toBe("Manual");
+    expect(results[1]!.status).toBe("Manual");
+    expect(results[2]!.status).toBe("Sí"); // Should stay the same
+    expect(results[3]!.status).toBe("Manual"); // Should NOW be Manual (previously stayed N/A)
   });
 
   it("should correctly handle full itemId strings with AC prefix", () => {
@@ -27,7 +27,7 @@ describe("ManualReviewMiddleware", () => {
 
     const results = ManualReviewMiddleware.sanitize(findings);
 
-    expect(results[0].status).toBe("Sí");
-    expect(results[1].status).toBe("Manual");
+    expect(results[0]!.status).toBe("Sí");
+    expect(results[1]!.status).toBe("Manual");
   });
 });

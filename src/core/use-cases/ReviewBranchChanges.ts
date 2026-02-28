@@ -15,11 +15,12 @@ export class ReviewBranchChanges {
     acceptanceCriteria: string,
     standards: string,
     baseBranch: string | null = null,
+    targetBranches: string[] = [],
     onEvent?: (event: any) => void,
     scope: ReviewScope = "both",
   ): Promise<Finding[]> {
     // 1. Get code changes
-    const gitContext = await this.gitDriver.getDiff(baseBranch);
+    const gitContext = await this.gitDriver.getDiff(baseBranch, targetBranches);
 
     // 2. Load checklist
     const currentFile = new URL(import.meta.url).pathname;
@@ -35,6 +36,17 @@ export class ReviewBranchChanges {
       checklist = checklistData.backend;
     } else {
       checklist = [...checklistData.frontend, ...checklistData.backend];
+    }
+
+    // 2.1 Notify total items for progress tracking
+    if (onEvent) {
+      const acCount = acceptanceCriteria
+        .split("\n")
+        .filter((l) => l.trim().length > 0).length;
+      onEvent({
+        type: "metadata",
+        totalItems: acCount + checklist.length,
+      });
     }
 
     // 3. Perform AI Review

@@ -4,5 +4,9 @@ export interface GitContext {
 }
 
 export interface GitDriver {
-  getDiff(baseBranch: string | null): Promise<GitContext>;
+  getDiff(
+    baseBranch: string | null,
+    targetBranches: string[],
+  ): Promise<GitContext>;
+  listBranches(): Promise<string[]>;
 }

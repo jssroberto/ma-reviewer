@@ -290,7 +290,31 @@ program
       scope = selectedScope;
     }
 
-    // 3. Execution
+    // 3. Branch Selection Logic
+    const allBranches = await gitDriver.listBranches();
+    let targetBranches: string[] = [];
+
+    // Filter out origin/ branches for cleaner local selection if desired, or keep all
+    const localBranches = allBranches.filter((b) => !b.startsWith("remotes/"));
+
+    const { selectedBranches } = await inquirer.prompt([
+      {
+        type: "checkbox",
+        name: "selectedBranches",
+        message: "Select branch(es) to review against the base:",
+        choices: localBranches.map((b) => ({
+          name: b,
+          value: b,
+          checked:
+            b === "HEAD" || b === allBranches.find((curr) => curr !== "HEAD"), // Heuristic: check current
+        })),
+        validate: (input) =>
+          input.length > 0 || "You must select at least one branch.",
+      },
+    ]);
+    targetBranches = selectedBranches;
+
+    // 4. Execution
     try {
       feedbackPresenter.start();
 
@@ -299,6 +323,7 @@ program
         acceptanceCriteria,
         standardsContent,
         (options as any).base === "origin/main" ? null : (options as any).base,
+        targetBranches,
         (event: any) => feedbackPresenter.handleEvent(event),
         scope as any,
       );

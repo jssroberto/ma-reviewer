@@ -11,6 +11,7 @@ describe("ReviewBranchChanges Use Case", () => {
         diff: "index 123..456 100644\n--- a/file.ts\n+++ b/file.ts\n@@ -1 +1 @@\n-old\n+new",
         changedFiles: ["file.ts"],
       }),
+      listBranches: vi.fn().mockResolvedValue(["main", "feat/1"]),
     };
 
     // Mock AI Driver
@@ -28,11 +29,12 @@ describe("ReviewBranchChanges Use Case", () => {
       "Test Criteria",
       "Test Standards",
       "main",
+      [],
     );
 
     expect(findings).toHaveLength(1);
     expect(findings[0]!.itemId).toBe("Standard 1");
-    expect(mockGit.getDiff).toHaveBeenCalledWith("main");
+    expect(mockGit.getDiff).toHaveBeenCalledWith("main", []);
     expect(mockAI.review).toHaveBeenCalled();
   });
 });
