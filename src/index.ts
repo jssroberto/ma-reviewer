@@ -21,7 +21,12 @@ function saveStoryToCache(story: string, criteria: string) {
       story.split("\n")[0]?.substring(0, 50).trim() || "Untitled";
     fs.writeFileSync(
       CACHE_FILE,
-      JSON.stringify({ story, criteria, featureName }),
+      JSON.stringify({
+        story,
+        criteria,
+        featureName,
+        standardsFile: (global as any).selectedStandardsFile,
+      }),
     );
   } catch (e) {
     // Ignore cache errors
@@ -196,7 +201,62 @@ program
     // Save to cache for next time
     saveStoryToCache(userStory, acceptanceCriteria);
 
-    // 2.1 Scope Selection
+    // 2.1 Technology Standards Selection
+    const resourcesPath = path.join(
+      path.dirname(new URL(import.meta.url).pathname),
+      "../resources/standards",
+    );
+    const standardsFiles = fs
+      .readdirSync(resourcesPath)
+      .filter((f) => f.endsWith(".md"));
+
+    let selectedStandardsFile = "";
+    const cache = getStoryFromCache();
+
+    if (
+      cache &&
+      cache.standardsFile &&
+      standardsFiles.includes(cache.standardsFile)
+    ) {
+      const { reuseStandards } = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "reuseStandards",
+          message: `Reuse standards for "${chalk.cyan(cache.standardsFile)}"?`,
+          default: true,
+        },
+      ]);
+      if (reuseStandards) {
+        selectedStandardsFile = cache.standardsFile;
+      }
+    }
+
+    if (!selectedStandardsFile) {
+      const { standards } = await inquirer.prompt([
+        {
+          type: "rawlist",
+          name: "standards",
+          message: "Select Technology Standards:",
+          choices: standardsFiles.map((f) => ({
+            name: f
+              .replace(".md", "")
+              .split("-")
+              .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+              .join(" "),
+            value: f,
+          })),
+        },
+      ]);
+      selectedStandardsFile = standards;
+    }
+
+    (global as any).selectedStandardsFile = selectedStandardsFile;
+    const standardsContent = fs.readFileSync(
+      path.join(resourcesPath, selectedStandardsFile),
+      "utf-8",
+    );
+
+    // 2.2 Scope Selection
     let scope = (options as any).scope;
     if (!scope || !["frontend", "backend", "both"].includes(scope)) {
       const { selectedScope } = await inquirer.prompt([
@@ -221,6 +281,7 @@ program
       const findings = await useCase.execute(
         userStory,
         acceptanceCriteria,
+        standardsContent,
         (options as any).base === "origin/main" ? null : (options as any).base,
         (event: any) => feedbackPresenter.handleEvent(event),
         scope as any,

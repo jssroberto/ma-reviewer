@@ -26,6 +26,7 @@ describe("ReviewBranchChanges Use Case", () => {
     const findings = await useCase.execute(
       "Test Story",
       "Test Criteria",
+      "Test Standards",
       "main",
     );
 

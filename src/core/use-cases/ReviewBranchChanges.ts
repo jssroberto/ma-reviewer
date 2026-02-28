@@ -13,6 +13,7 @@ export class ReviewBranchChanges {
   async execute(
     userStory: string,
     acceptanceCriteria: string,
+    standards: string,
     baseBranch: string | null = null,
     onEvent?: (event: any) => void,
     scope: ReviewScope = "both",
@@ -20,18 +21,9 @@ export class ReviewBranchChanges {
     // 1. Get code changes
     const gitContext = await this.gitDriver.getDiff(baseBranch);
 
-    // 2. Load standards and checklist
+    // 2. Load checklist
     const currentFile = new URL(import.meta.url).pathname;
     const rootPath = path.resolve(path.dirname(currentFile), "../../../");
-
-    const standardsPath = path.join(
-      rootPath,
-      "resources",
-      "standares-js-ts.md",
-    );
-    const standards = fs.existsSync(standardsPath)
-      ? fs.readFileSync(standardsPath, "utf-8")
-      : "";
 
     const checklistPath = path.join(rootPath, "resources", "checklist.json");
     const checklistData = JSON.parse(fs.readFileSync(checklistPath, "utf-8"));
