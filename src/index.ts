@@ -1,3 +1,4 @@
+#!/usr/bin/env tsx
 import chalk from "chalk";
 import { Command } from "commander";
 import * as fs from "fs";

@@ -1,0 +1,5 @@
+#!/bin/bash
+# Get the directory of the script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Run index.ts using tsx from the project root
+exec npx tsx "$DIR/../src/index.ts" "$@"
