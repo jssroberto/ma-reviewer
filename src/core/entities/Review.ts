@@ -4,6 +4,7 @@ export interface Finding {
   itemId: string;
   status: ChecklistStatus;
   finding: string;
+  requirement?: string;
   evidence?: string;
 }
 

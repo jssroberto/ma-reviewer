@@ -62,9 +62,26 @@ export class ReviewBranchChanges {
       onEvent,
     );
 
-    // 4. Post-process with deterministic middleware
+    // 4. Enrich Findings with original requirement text
+    const enrichedFindings = findings.map((f) => {
+      if (f.itemId.startsWith("AC:")) {
+        // For ACs, the itemId IS the requirement name (e.g., "AC: Login with Google")
+        return { ...f, requirement: f.itemId.replace("AC:", "").trim() };
+      }
+
+      const idMatch = f.itemId.match(/\d+/);
+      if (idMatch) {
+        const index = parseInt(idMatch[0]!, 10) - 1;
+        if (checklist[index]) {
+          return { ...f, requirement: checklist[index] };
+        }
+      }
+      return f;
+    });
+
+    // 5. Post-process with deterministic middleware
     const { ManualReviewMiddleware } =
       await import("../utils/ManualReviewMiddleware.js");
-    return ManualReviewMiddleware.sanitize(findings);
+    return ManualReviewMiddleware.sanitize(enrichedFindings);
   }
 }
