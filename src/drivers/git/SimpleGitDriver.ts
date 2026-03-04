@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import type { SimpleGit } from "simple-git";
 import { simpleGit } from "simple-git";
+import { CleanupManager } from "../../core/utils/CleanupManager.js";
 import type { GitContext, GitDriver } from "./GitDriver.js";
 
 export class SimpleGitDriver implements GitDriver {
@@ -57,6 +58,17 @@ export class SimpleGitDriver implements GitDriver {
         chalk.gray(
           `🔨 Creating temporary merge branch: ${chalk.bold(cleanupBranch)}`,
         ),
+      );
+
+      const branchName = cleanupBranch;
+      CleanupManager.getInstance().registerAction(
+        `Delete branch ${branchName}`,
+        async () => {
+          try {
+            await this.git.checkout(["-"]);
+            await this.git.deleteLocalBranch(branchName, true);
+          } catch (e) {}
+        },
       );
 
       try {
@@ -142,6 +154,9 @@ export class SimpleGitDriver implements GitDriver {
 
       // Cleanup
       if (cleanupBranch) {
+        CleanupManager.getInstance().unregisterAction(
+          `Delete branch ${cleanupBranch}`,
+        );
         await this.git.checkout(["-"]);
         await this.git.deleteLocalBranch(cleanupBranch, true);
         console.log(chalk.gray(`🧹 Cleaned up temporary branch.`));

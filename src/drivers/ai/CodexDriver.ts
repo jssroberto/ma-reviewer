@@ -1,7 +1,9 @@
 import { spawn } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { createInterface } from "readline";
+import { CleanupManager } from "../../core/utils/CleanupManager.js";
 import type { Finding } from "../../core/entities/Review.js";
 import { JsonExtractor } from "../../core/utils/JsonExtractor.js";
 import type { AIDriver, AIReviewRequest } from "./AIDriver.js";
@@ -11,7 +13,9 @@ export class CodexDriver implements AIDriver {
     request: AIReviewRequest,
     onEvent?: (event: any) => void,
   ): Promise<Finding[]> {
-    const agentsFile = path.join(process.cwd(), "AGENTS.md");
+    const cleanupManager = CleanupManager.getInstance();
+    const agentsFile = path.join(os.tmpdir(), `ma-agents-${Date.now()}.md`);
+    cleanupManager.registerFile(agentsFile);
 
     // 1. Prepare AGENTS.md with standards and checklist
     const agentsContent = `
@@ -61,7 +65,7 @@ ${request.userStory}
 ${request.acceptanceCriteria}
 
 --- GENERAL STANDARDS ---
-Checklist: See AGENTS.md
+Checklist: See the attached file ${path.basename(agentsFile)}
 
 --- EXPECTED OUTPUT FORMAT (JSON ONLY) ---
 ---BEGIN_JSON---
@@ -110,12 +114,13 @@ Checklist: See AGENTS.md
         }
       });
 
-      child.stderr.on("data", (data) => {
+      child.stderr.on("data", (data: any) => {
         // Silencing stderr for events unless we decide to log it
       });
 
-      child.on("close", (code) => {
+      child.on("close", async (code: number) => {
         if (code !== 0) {
+          await cleanupManager.cleanup();
           return reject(new Error(`Codex process exited with code ${code}`));
         }
 
@@ -125,13 +130,15 @@ Checklist: See AGENTS.md
             "---BEGIN_JSON---",
             "---END_JSON---",
           );
+          await cleanupManager.cleanup();
           resolve(findings);
         } catch (error) {
+          await cleanupManager.cleanup();
           resolve([]);
         }
       });
 
-      child.on("error", (err) => {
+      child.on("error", (err: any) => {
         reject(err);
       });
     });

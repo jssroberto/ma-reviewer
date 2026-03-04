@@ -2,6 +2,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { Container } from "./infrastructure/Container.js";
+import { CleanupManager } from "./core/utils/CleanupManager.js";
 
 async function main() {
   const program = new Command();
@@ -11,6 +12,16 @@ async function main() {
     .name("ma-reviewer")
     .description("Automated Peer Review Orchestrator for Media Aérea")
     .version("1.0.0");
+
+  // Handle interruption signals
+  const cleanupAndExit = async (signal: string) => {
+    console.log(chalk.dim(`\n\n(Cleaning up before exit...)`));
+    await CleanupManager.getInstance().cleanup();
+    process.exit(0);
+  };
+
+  process.on("SIGINT", () => cleanupAndExit("SIGINT"));
+  process.on("SIGTERM", () => cleanupAndExit("SIGTERM"));
 
   program
     .command("review")
@@ -45,12 +56,22 @@ async function main() {
   }
 }
 
-// Global unhandled promise rejection handler
-process.on("unhandledRejection", (reason) => {
+// Global error handlers
+process.on("unhandledRejection", async (reason) => {
   console.error(
     chalk.red.bold("\n🛑 Unhandled Promise Rejection:"),
     chalk.red(reason),
   );
+  await CleanupManager.getInstance().cleanup();
+  process.exit(1);
+});
+
+process.on("uncaughtException", async (error) => {
+  console.error(
+    chalk.red.bold("\n💥 Uncaught Exception:"),
+    chalk.red(error.message || error),
+  );
+  await CleanupManager.getInstance().cleanup();
   process.exit(1);
 });
 
