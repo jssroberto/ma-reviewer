@@ -43,29 +43,57 @@ cd auto-peer-review
 
 # Install dependencies
 pnpm install
+
+# (Optional) Install the CLI globally to use 'ma-reviewer' anywhere
+pnpm add -g .
 ```
 
-### Running a Review
-The review process is **mandatory and interactive** to ensure business alignment.
+---
+
+## 🧙 The Review Wizard (Interactive Mode)
+
+The `ma-reviewer` is designed as an **interactive wizard** rather than a silent CLI tool. This ensures that every review is aligned with the specific business requirements of the task.
+
+### 🏃 Quick Start
+```bash
+# Using the installed CLI
+ma-reviewer review
+
+# Or via pnpm (aliased shortcut)
+pnpm run review
+```
+
+### 🧠 Smart Features
+- **Session Caching**: The tool remembers your last **Historia de Usuario**, **Criterios de Aceptación**, and **Technology Standards**. On subsequent runs, it will ask if you'd like to reuse them, saving you from re-typing or re-linking files.
+- **Multi-Branch Selection**: During the audit, you can select one or multiple feature branches using the **spacebar**. The tool will intelligently calculate the diff for all selected changes.
+- **Base Branch Recommendations**: The wizard scans your repository and recommends the most logical base branch (e.g., `origin/main` or `dev`) for comparison.
+
+### 🛠️ Step-by-Step Flow
+1.  **Requirement Collection**: Choose between inputting the Story/AC manually (opens your default editor) or providing a path to a `.md` file.
+2.  **Standards Selection**: Pick the relevant technical standards (Python, PHP, JS/TS, etc.).
+3.  **Branch Picking**: Select which feature branches to audit and confirm the base merge target.
+4.  **Review Scope**: Filter the audit for Frontend, Backend, or Both.
+
+### 📊 Understanding Audit Results
+Once the AI completes the audit, the tool provides two distinct outputs:
+1.  **Terminal Summary**: A color-coded table showing Passed, Failed, and items requiring **Manual Review**.
+2.  **Browser Auto-fill Script**: A custom JavaScript snippet. Copy and paste this into the console of Media Aérea's internal review tool to automatically populate it with the AI's findings.
+
+---
+
+## ⚙️ Advanced Usage (Flags)
+While the wizard is the recommended way to use the tool, you can skip parts of it using flags:
 
 ```bash
-# Basic usage (defaults to origin/main)
-pnpm run review
-
-# Compare against a specific base branch
-pnpm run review -b dev
+# Using the CLI
+ma-reviewer review -b dev
 
 # Provide the User Story file directly
-pnpm run review -s ./docs/MY_USER_STORY.md
+ma-reviewer review -s ./docs/MY_USER_STORY.md
 
 # Specify review scope (frontend, backend, both)
-pnpm run review --scope backend
+ma-reviewer review --scope backend
 ```
-
-If you don't provide mandatory info via flags, the CLI will interactively prompt you for:
-1.  **Historia de Usuario & Criterios de Aceptación** (Input manually or provide file path).
-2.  **Technology Standards Selection**: Choose from Python, PHP, Kotlin, JS/TS, or Web Performance.
-3.  **Review Scope**: Filter the checklist for Frontend, Backend, or Full Stack (Both).
 
 ---
 
