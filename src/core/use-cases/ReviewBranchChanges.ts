@@ -82,6 +82,6 @@ export class ReviewBranchChanges {
     // 5. Post-process with deterministic middleware
     const { ManualReviewMiddleware } =
       await import("../utils/ManualReviewMiddleware.js");
-    return ManualReviewMiddleware.sanitize(enrichedFindings);
+    return ManualReviewMiddleware.sanitize(enrichedFindings, scope);
   }
 }

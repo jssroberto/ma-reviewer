@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ManualReviewMiddleware } from "../src/core/utils/ManualReviewMiddleware.js";
 import type { Finding } from "../src/core/entities/Review.js";
+import { ManualReviewMiddleware } from "../src/core/utils/ManualReviewMiddleware.js";
 
 describe("ManualReviewMiddleware", () => {
   it("should force Manual status for specific frontend IDs if they are not N/A", () => {
@@ -29,5 +29,17 @@ describe("ManualReviewMiddleware", () => {
 
     expect(results[0]!.status).toBe("Sí");
     expect(results[1]!.status).toBe("Manual");
+  });
+
+  it("should NOT force Manual status for backend scope", () => {
+    const findings: Finding[] = [
+      { itemId: "1", status: "Sí", finding: "Logic matches" }, // Manual ID for frontend, but backend item 1 is "Requerimientos"
+      { itemId: "23", status: "Sí", finding: "Tests passed" }, // Manual ID for frontend, but backend item 23 is "Pruebas Unitarias"
+    ];
+
+    const results = ManualReviewMiddleware.sanitize(findings, "backend");
+
+    expect(results[0]!.status).toBe("Sí");
+    expect(results[1]!.status).toBe("Sí");
   });
 });

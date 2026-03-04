@@ -86,10 +86,24 @@ export class SimpleGitDriver implements GitDriver {
       comparisonTarget = targetBranches[0];
     }
 
-    const revision = `${targetBase}...${comparisonTarget}`;
+    // 3. Determine the revision for diffing
+    let revision = `${targetBase}...${comparisonTarget}`;
+
+    // Optimization: If it's a single branch review, check if it's already merged
+    if (targetBranches.length === 1 && targetBranches[0]) {
+      const smartRevision = await this.findSmartRevision(
+        targetBase,
+        targetBranches[0],
+      );
+      if (smartRevision) {
+        revision = smartRevision;
+      }
+    }
+
+    console.log(chalk.gray(`📊 Comparing revision: ${chalk.bold(revision)}`));
 
     try {
-      // 3. Validate revision
+      // 4. Validate revision
       const base = revision.split("...")[0] || "HEAD";
       await this.git.revparse([base]);
     } catch (e) {
@@ -105,6 +119,26 @@ export class SimpleGitDriver implements GitDriver {
     try {
       const diff = await this.git.diff([revision]);
       const status = await this.git.diffSummary([revision]);
+
+      // Logging diff details
+      console.log(
+        chalk.gray(
+          `📄 Files changed: ${chalk.white(status.files.length)} | Diff size: ${chalk.white(diff.length)} chars`,
+        ),
+      );
+
+      if (diff.length > 0) {
+        const previewSize = 500;
+        const preview =
+          diff.length > previewSize
+            ? diff.substring(0, previewSize) + "..."
+            : diff;
+        console.log(chalk.blue("\n--- Diff Preview ---"));
+        console.log(chalk.gray(preview));
+        console.log(chalk.blue("--------------------\n"));
+      } else {
+        console.log(chalk.yellow("⚠️ No changes found between branches."));
+      }
 
       // Cleanup
       if (cleanupBranch) {
@@ -138,5 +172,57 @@ export class SimpleGitDriver implements GitDriver {
     } catch (e) {
       return [];
     }
+  }
+
+  /**
+   * Finds a smart revision string for a branch that might already be merged.
+   * If the branch is merged, it finds the first merge commit and diffs against its parent.
+   */
+  private async findSmartRevision(
+    base: string,
+    target: string,
+  ): Promise<string | null> {
+    try {
+      // Check if standard diff is empty
+      const diff = await this.git.diff([`${base}...${target}`]);
+      if (diff.trim().length > 0) {
+        return null; // Standard diff works fine
+      }
+
+      // It's likely merged. Find the merge commit that integrated the target into the base.
+      // We look for merges in the base's history that have the target as an ancestor.
+      const rawLog = await this.git.raw([
+        "rev-list",
+        `${target}..${base}`,
+        "--ancestry-path",
+        "--first-parent",
+        "--merges",
+      ]);
+
+      const mergeCommits = rawLog.trim().split("\n").filter(Boolean);
+      if (mergeCommits.length === 0) {
+        return null; // Could not find a merge commit (e.g., fast-forward)
+      }
+
+      // The LAST commit in this list is the OLDEST merge commit that integrated the branch.
+      const firstMerge = mergeCommits[mergeCommits.length - 1];
+
+      if (firstMerge) {
+        console.log(
+          chalk.yellow(
+            `✨ Smart Merge Base detected! Branch ${chalk.bold(target)} is already merged into ${chalk.bold(base)}.`,
+          ),
+        );
+        console.log(
+          chalk.gray(
+            `   Using original merge point: ${chalk.bold(firstMerge.substring(0, 7))}^1`,
+          ),
+        );
+        return `${firstMerge}^1...${target}`;
+      }
+    } catch (e) {
+      // Fallback to standard if anything fails
+    }
+    return null;
   }
 }
